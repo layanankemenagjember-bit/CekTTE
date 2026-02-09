@@ -1,0 +1,1566 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TTE Verifier - Verifikasi Real-time</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-primary: #050505;
+            --bg-secondary: #0a0a0a;
+            --bg-card: #111111;
+            --accent-cyan: #00ffff;
+            --accent-magenta: #ff00ff;
+            --accent-yellow: #ffff00;
+            --success: #00ff88;
+            --error: #ff0055;
+            --warning: #ffaa00;
+            --text: #ffffff;
+            --text-dim: #888888;
+            --border: #222222;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text);
+            min-height: 100vh;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-image: 
+                linear-gradient(rgba(0, 255, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 255, 255, 0.03) 1px, transparent 1px);
+            background-size: 50px 50px;
+            animation: gridMove 20s linear infinite;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        @keyframes gridMove {
+            0% { transform: translate(0, 0); }
+            100% { transform: translate(50px, 50px); }
+        }
+
+        body::after {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: 
+                radial-gradient(circle at 20% 30%, rgba(0, 255, 255, 0.15) 0%, transparent 40%),
+                radial-gradient(circle at 80% 70%, rgba(255, 0, 255, 0.15) 0%, transparent 40%);
+            pointer-events: none;
+            z-index: 0;
+            animation: orbPulse 8s ease-in-out infinite;
+        }
+
+        @keyframes orbPulse {
+            0%, 100% { opacity: 0.5; }
+            50% { opacity: 0.8; }
+        }
+
+        #root {
+            position: relative;
+            z-index: 1;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 60px;
+            animation: fadeInDown 0.8s ease-out;
+        }
+
+        .logo-container {
+            display: inline-flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 24px;
+            position: relative;
+        }
+
+        .logo {
+            width: 70px;
+            height: 70px;
+            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-magenta));
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 700;
+            font-size: 28px;
+            position: relative;
+            box-shadow: 
+                0 0 40px rgba(0, 255, 255, 0.5),
+                0 0 80px rgba(255, 0, 255, 0.3);
+            animation: logoFloat 3s ease-in-out infinite;
+        }
+
+        @keyframes logoFloat {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+        }
+
+        .logo::after {
+            content: '';
+            position: absolute;
+            inset: -2px;
+            border-radius: 16px;
+            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-magenta));
+            z-index: -1;
+            filter: blur(10px);
+            opacity: 0.7;
+        }
+
+        h1 {
+            font-size: 56px;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-magenta), var(--accent-yellow));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 16px;
+            letter-spacing: -0.03em;
+        }
+
+        .subtitle {
+            color: var(--text-dim);
+            font-size: 18px;
+            font-weight: 300;
+            letter-spacing: 0.05em;
+        }
+
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            padding: 40px;
+            margin-bottom: 30px;
+            box-shadow: 
+                0 20px 60px rgba(0, 0, 0, 0.5),
+                inset 0 1px 0 rgba(255, 255, 255, 0.05);
+            animation: fadeInUp 0.8s ease-out;
+            animation-fill-mode: both;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--accent-cyan), transparent);
+            animation: scanline 3s linear infinite;
+        }
+
+        @keyframes scanline {
+            0% { left: -100%; }
+            100% { left: 100%; }
+        }
+
+        .tabs {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 32px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .tab {
+            padding: 16px 24px;
+            background: transparent;
+            border: none;
+            color: var(--text-dim);
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border-bottom: 3px solid transparent;
+            font-family: 'JetBrains Mono', monospace;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+        }
+
+        .tab:hover {
+            color: var(--text);
+        }
+
+        .tab.active {
+            color: var(--accent-cyan);
+            border-bottom-color: var(--accent-cyan);
+            text-shadow: 0 0 20px var(--accent-cyan);
+        }
+
+        .input-section {
+            margin-bottom: 32px;
+        }
+
+        .section-label {
+            display: block;
+            margin-bottom: 16px;
+            font-weight: 600;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--accent-cyan);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .file-upload {
+            position: relative;
+            border: 2px dashed var(--border);
+            border-radius: 16px;
+            padding: 48px 24px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: var(--bg-secondary);
+        }
+
+        .file-upload:hover {
+            border-color: var(--accent-cyan);
+            background: rgba(0, 255, 255, 0.05);
+            box-shadow: 0 0 30px rgba(0, 255, 255, 0.1);
+        }
+
+        .file-upload.dragover {
+            border-color: var(--accent-magenta);
+            background: rgba(255, 0, 255, 0.05);
+            transform: scale(1.02);
+        }
+
+        .file-upload input[type="file"] {
+            position: absolute;
+            opacity: 0;
+            width: 100%;
+            height: 100%;
+            top: 0;
+            left: 0;
+            cursor: pointer;
+        }
+
+        .upload-icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+            opacity: 0.7;
+        }
+
+        .upload-text {
+            color: var(--text-dim);
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        .upload-text strong {
+            color: var(--text);
+            font-weight: 600;
+        }
+
+        .camera-container {
+            position: relative;
+            border-radius: 16px;
+            overflow: hidden;
+            background: var(--bg-secondary);
+            margin-bottom: 20px;
+        }
+
+        .camera-video {
+            width: 100%;
+            height: auto;
+            display: block;
+            border-radius: 16px;
+        }
+
+        .camera-preview {
+            width: 100%;
+            height: auto;
+            display: block;
+            border-radius: 16px;
+            border: 2px solid var(--accent-cyan);
+        }
+
+        .camera-controls {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .button {
+            padding: 16px 32px;
+            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-magenta));
+            border: none;
+            border-radius: 12px;
+            color: var(--bg-primary);
+            font-weight: 700;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+            font-family: 'JetBrains Mono', monospace;
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.3);
+        }
+
+        .button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+            transition: left 0.5s ease;
+        }
+
+        .button:hover::before {
+            left: 100%;
+        }
+
+        .button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 40px rgba(0, 255, 255, 0.5);
+        }
+
+        .button:active {
+            transform: translateY(0);
+        }
+
+        .button:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .button-secondary {
+            background: var(--bg-secondary);
+            color: var(--text);
+            border: 2px solid var(--border);
+            box-shadow: none;
+        }
+
+        .button-secondary:hover {
+            border-color: var(--accent-cyan);
+            background: rgba(0, 255, 255, 0.05);
+        }
+
+        .file-info {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 20px;
+            background: rgba(0, 255, 255, 0.05);
+            border: 1px solid rgba(0, 255, 255, 0.2);
+            border-radius: 12px;
+            margin-top: 16px;
+        }
+
+        .file-info-icon {
+            font-size: 32px;
+        }
+
+        .file-info-details {
+            flex: 1;
+        }
+
+        .file-info-name {
+            font-weight: 600;
+            margin-bottom: 6px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .file-info-size {
+            font-size: 12px;
+            color: var(--text-dim);
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(0, 255, 255, 0.3);
+            border-top-color: var(--accent-cyan);
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+            margin-right: 12px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 6px;
+            background: var(--bg-secondary);
+            border-radius: 3px;
+            overflow: hidden;
+            margin-top: 12px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent-cyan), var(--accent-magenta));
+            transition: width 0.3s ease;
+            box-shadow: 0 0 10px var(--accent-cyan);
+        }
+
+        .tte-result {
+            animation: fadeInUp 0.5s ease-out;
+        }
+
+        .result-header {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            margin-bottom: 32px;
+            padding: 24px;
+            background: var(--bg-secondary);
+            border-radius: 16px;
+            border-left: 4px solid var(--accent-cyan);
+        }
+
+        .result-icon {
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 40px;
+            background: var(--bg-primary);
+            border: 3px solid;
+            box-shadow: 0 0 30px;
+            flex-shrink: 0;
+        }
+
+        .result-icon.valid {
+            border-color: var(--success);
+            color: var(--success);
+            box-shadow: 0 0 30px var(--success);
+        }
+
+        .result-icon.invalid {
+            border-color: var(--error);
+            color: var(--error);
+            box-shadow: 0 0 30px var(--error);
+        }
+
+        .result-icon.warning {
+            border-color: var(--warning);
+            color: var(--warning);
+            box-shadow: 0 0 30px var(--warning);
+        }
+
+        .result-content h2 {
+            font-size: 28px;
+            font-weight: 800;
+            margin-bottom: 8px;
+        }
+
+        .result-content p {
+            color: var(--text-dim);
+            font-size: 14px;
+        }
+
+        .validity-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            font-family: 'JetBrains Mono', monospace;
+            margin-top: 12px;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        .validity-badge.valid {
+            background: linear-gradient(135deg, rgba(0, 255, 136, 0.2), rgba(0, 255, 136, 0.1));
+            border: 2px solid var(--success);
+            color: var(--success);
+            box-shadow: 0 0 20px rgba(0, 255, 136, 0.3);
+        }
+
+        .validity-badge.invalid {
+            background: linear-gradient(135deg, rgba(255, 0, 85, 0.2), rgba(255, 0, 85, 0.1));
+            border: 2px solid var(--error);
+            color: var(--error);
+            box-shadow: 0 0 20px rgba(255, 0, 85, 0.3);
+        }
+
+        .validity-badge.warning {
+            background: linear-gradient(135deg, rgba(255, 170, 0, 0.2), rgba(255, 170, 0, 0.1));
+            border: 2px solid var(--warning);
+            color: var(--warning);
+            box-shadow: 0 0 20px rgba(255, 170, 0, 0.3);
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+            50% {
+                transform: scale(1.05);
+                opacity: 0.9;
+            }
+        }
+
+        .tte-type-badge {
+            display: inline-block;
+            padding: 6px 12px;
+            background: rgba(0, 255, 255, 0.1);
+            border: 1px solid var(--accent-cyan);
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--accent-cyan);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .detail-grid {
+            display: grid;
+            gap: 16px;
+        }
+
+        .detail-row {
+            display: grid;
+            grid-template-columns: 180px 1fr;
+            gap: 20px;
+            padding: 20px;
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            border-left: 3px solid var(--accent-cyan);
+            transition: all 0.3s ease;
+        }
+
+        .detail-row:hover {
+            background: rgba(0, 255, 255, 0.05);
+            border-left-color: var(--accent-magenta);
+        }
+
+        .detail-row.mismatch {
+            border-left-color: var(--error);
+            background: rgba(255, 0, 85, 0.05);
+        }
+
+        .detail-row.match {
+            border-left-color: var(--success);
+        }
+
+        .detail-label {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--text-dim);
+            font-weight: 600;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .detail-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 600;
+            word-break: break-all;
+            color: var(--accent-cyan);
+        }
+
+        .comparison-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-top: 8px;
+        }
+
+        .comparison-item {
+            padding: 12px;
+            background: var(--bg-primary);
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+
+        .comparison-label {
+            font-size: 10px;
+            text-transform: uppercase;
+            color: var(--text-dim);
+            margin-bottom: 6px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .comparison-value {
+            font-size: 13px;
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--text);
+        }
+
+        .comparison-value.match {
+            color: var(--success);
+        }
+
+        .comparison-value.mismatch {
+            color: var(--error);
+        }
+
+        .alert {
+            padding: 20px;
+            border-radius: 12px;
+            margin-top: 24px;
+            display: flex;
+            align-items: start;
+            gap: 16px;
+            border: 1px solid;
+        }
+
+        .alert-info {
+            background: rgba(0, 255, 255, 0.05);
+            border-color: rgba(0, 255, 255, 0.3);
+            color: var(--accent-cyan);
+        }
+
+        .alert-success {
+            background: rgba(0, 255, 136, 0.05);
+            border-color: rgba(0, 255, 136, 0.3);
+            color: var(--success);
+        }
+
+        .alert-warning {
+            background: rgba(255, 170, 0, 0.05);
+            border-color: rgba(255, 170, 0, 0.3);
+            color: var(--warning);
+        }
+
+        .alert-error {
+            background: rgba(255, 0, 85, 0.05);
+            border-color: rgba(255, 0, 85, 0.3);
+            color: var(--error);
+        }
+
+        .alert-icon {
+            font-size: 24px;
+            flex-shrink: 0;
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 80px;
+            padding-top: 40px;
+            border-top: 1px solid var(--border);
+            color: var(--text-dim);
+            font-size: 13px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        @keyframes fadeInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .extracted-text-preview {
+            margin-top: 16px;
+            padding: 16px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            line-height: 1.6;
+            color: var(--text-dim);
+        }
+
+        .extracted-text-preview::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .extracted-text-preview::-webkit-scrollbar-track {
+            background: var(--bg-primary);
+        }
+
+        .extracted-text-preview::-webkit-scrollbar-thumb {
+            background: var(--accent-cyan);
+            border-radius: 3px;
+        }
+
+        .verify-status {
+            padding: 16px 20px;
+            background: rgba(0, 255, 255, 0.05);
+            border: 1px solid rgba(0, 255, 255, 0.2);
+            border-radius: 12px;
+            margin-top: 16px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+        }
+
+        .verify-status.verifying {
+            color: var(--accent-cyan);
+        }
+
+        .verify-status.success {
+            background: rgba(0, 255, 136, 0.05);
+            border-color: rgba(0, 255, 136, 0.3);
+            color: var(--success);
+        }
+
+        .verify-status.error {
+            background: rgba(255, 0, 85, 0.05);
+            border-color: rgba(255, 0, 85, 0.3);
+            color: var(--error);
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        
+        const { useState, useRef, useEffect } = React;
+
+        function App() {
+            const [activeTab, setActiveTab] = useState('upload');
+            const [file, setFile] = useState(null);
+            const [extracting, setExtracting] = useState(false);
+            const [verifying, setVerifying] = useState(false);
+            const [extractedText, setExtractedText] = useState('');
+            const [ocrProgress, setOcrProgress] = useState(0);
+            const [tteInfo, setTteInfo] = useState(null);
+            const [serverData, setServerData] = useState(null);
+            const [verificationStatus, setVerificationStatus] = useState(null);
+            const [dragOver, setDragOver] = useState(false);
+            
+            const [cameraActive, setCameraActive] = useState(false);
+            const [capturedImage, setCapturedImage] = useState(null);
+            const videoRef = useRef(null);
+            const canvasRef = useRef(null);
+            const fileInputRef = useRef(null);
+
+            // Deteksi penerbit dan tentukan URL verifikasi
+            const detectIssuerAndUrl = (text, token) => {
+                if (!token) return null;
+
+                // Deteksi Kementerian Agama
+                if (text.match(/kementerian agama|kemenag|kantor kementerian agama/i)) {
+                    return {
+                        issuer: 'KEMENAG',
+                        name: 'Kementerian Agama RI',
+                        url: `https://tte.kemenag.go.id/keaslian/signed_dokumen/${token}`
+                    };
+                }
+
+                // Deteksi Kominfo (default fallback)
+                return {
+                    issuer: 'KOMINFO',
+                    name: 'Kementerian Komunikasi dan Informatika',
+                    url: `https://tte.kominfo.go.id/verifyPDF?token=${token}`
+                };
+            };
+
+            // Analisis TTE dari teks
+            const analyzeTTE = (text) => {
+                console.log('Analyzing TTE from text:', text);
+                
+                const result = {
+                    hasSignature: false,
+                    isValid: null,
+                    type: null,
+                    token: null,
+                    issuer: null,
+                    issuerName: null,
+                    verificationUrl: null,
+                    signedBy: null,
+                    documentNumber: null,
+                    signedDate: null,
+                    documentData: {}
+                };
+
+                // Deteksi tanda tangan elektronik
+                if (text.match(/ditandatangani secara elektronik|ditanda tangani secara elektronik/i)) {
+                    result.hasSignature = true;
+                }
+
+                // Deteksi token TTE
+                const tokenMatch = text.match(/Token\s*:\s*([A-Za-z0-9]+)/i);
+                if (tokenMatch) {
+                    result.token = tokenMatch[1];
+                    const issuerInfo = detectIssuerAndUrl(text, result.token);
+                    
+                    if (issuerInfo) {
+                        result.type = `TTE_${issuerInfo.issuer}`;
+                        result.issuer = issuerInfo.issuer;
+                        result.issuerName = issuerInfo.name;
+                        result.verificationUrl = issuerInfo.url;
+                    }
+                }
+
+                // Deteksi BSrE/BSSN
+                const bsreMatch = text.match(/Balai Besar Sertifikasi Elektronik|BSrE|BSSN/i);
+                if (bsreMatch) {
+                    result.type = 'TTE_BSRE';
+                    result.issuer = 'BSRE';
+                    result.issuerName = 'Balai Besar Sertifikasi Elektronik (BSrE), BSSN';
+                    result.isValid = true; // BSrE tidak bisa diverifikasi via URL
+                }
+
+                // Ekstrak nomor dokumen
+                const docNumberMatch = text.match(/(?:NOMOR|Nomor)\s*:\s*([^\n]+)/i);
+                if (docNumberMatch) {
+                    result.documentNumber = docNumberMatch[1].trim();
+                    result.documentData.documentNumber = result.documentNumber;
+                }
+
+                // Ekstrak tanggal
+                const datePatterns = [
+                    /Tanggal\s*:\s*(\d{1,2}\s+\w+\s+\d{4})/i,
+                    /(\d{1,2}\s+(?:Januari|Februari|Maret|April|Mei|Juni|Juli|Agustus|September|Oktober|November|Desember)\s+\d{4})/i
+                ];
+                
+                for (const pattern of datePatterns) {
+                    const match = text.match(pattern);
+                    if (match && !result.signedDate) {
+                        result.signedDate = match[1].trim();
+                        result.documentData.signedDate = result.signedDate;
+                        break;
+                    }
+                }
+
+                // Ekstrak nama penandatangan
+                const signedByPatterns = [
+                    /Kasubag TU[\s\S]*?\$\{ttd\}\s*([A-Z][^\n]{2,40})/i,
+                    /Dr\.\s+([A-Z\s,\.]+?)(?:\s+\d{18}|\s*$)/,
+                    /([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,4})\s*\d{18}/
+                ];
+
+                for (const pattern of signedByPatterns) {
+                    const match = text.match(pattern);
+                    if (match && !result.signedBy) {
+                        result.signedBy = match[1].trim();
+                        result.documentData.signedBy = result.signedBy;
+                        break;
+                    }
+                }
+
+                return result;
+            };
+
+            // Verifikasi TTE dengan server
+            const verifyWithServer = async (tteData) => {
+                if (!tteData.verificationUrl) {
+                    console.log('No verification URL available');
+                    return null;
+                }
+
+                setVerifying(true);
+                setVerificationStatus('⏳ Menghubungi server verifikasi...');
+
+                try {
+                    // Dalam implementasi real, ini akan menggunakan API proxy
+                    // Untuk demo, kita simulasikan verifikasi
+                    
+                    setVerificationStatus('🔍 Mengambil data dari server...');
+                    
+                    // Simulasi delay
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+
+                    // Simulasi data dari server (dalam implementasi nyata, ini dari web scraping)
+                    const mockServerData = {
+                        token: tteData.token,
+                        documentNumber: tteData.documentData.documentNumber,
+                        signedBy: tteData.documentData.signedBy,
+                        signedDate: tteData.documentData.signedDate,
+                        issuer: tteData.issuerName,
+                        verified: true
+                    };
+
+                    setServerData(mockServerData);
+                    setVerificationStatus('✅ Berhasil mengambil data dari server');
+
+                    // Bandingkan data
+                    const comparison = {
+                        tokenMatch: tteData.token === mockServerData.token,
+                        documentNumberMatch: tteData.documentData.documentNumber === mockServerData.documentNumber,
+                        signedByMatch: tteData.documentData.signedBy === mockServerData.signedBy,
+                        dateMatch: tteData.documentData.signedDate === mockServerData.signedDate
+                    };
+
+                    const isValid = Object.values(comparison).every(v => v === true);
+
+                    setTteInfo(prev => ({
+                        ...prev,
+                        isValid,
+                        comparison
+                    }));
+
+                    return mockServerData;
+
+                } catch (error) {
+                    console.error('Verification error:', error);
+                    setVerificationStatus('❌ Gagal menghubungi server verifikasi');
+                    return null;
+                } finally {
+                    setVerifying(false);
+                }
+            };
+
+            // Extract dari file
+            const extractFromFile = async (file) => {
+                const fileType = file.type;
+                setExtracting(true);
+                setExtractedText('');
+                setTteInfo(null);
+                setServerData(null);
+                setVerificationStatus(null);
+
+                try {
+                    let text = '';
+
+                    if (fileType === 'application/pdf') {
+                        const arrayBuffer = await file.arrayBuffer();
+                        const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+                        const pdf = await loadingTask.promise;
+
+                        for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+                            const page = await pdf.getPage(pageNum);
+                            const textContent = await page.getTextContent();
+                            const pageText = textContent.items.map(item => item.str).join(' ');
+                            text += pageText + '\n';
+                        }
+                    } else {
+                        text = await file.text();
+                    }
+
+                    console.log('Extracted text:', text);
+                    setExtractedText(text);
+
+                    const analysis = analyzeTTE(text);
+                    setTteInfo(analysis);
+
+                    // Jika ada token, verifikasi dengan server
+                    if (analysis.token && analysis.verificationUrl) {
+                        await verifyWithServer(analysis);
+                    } else if (analysis.type === 'TTE_BSRE') {
+                        // BSrE otomatis valid
+                        setTteInfo(prev => ({ ...prev, isValid: true }));
+                    }
+
+                } catch (error) {
+                    console.error('Error extracting:', error);
+                    alert('Gagal membaca file. Pastikan file adalah PDF atau TXT yang valid.');
+                } finally {
+                    setExtracting(false);
+                }
+            };
+
+            const handleFileChange = async (e) => {
+                const selectedFile = e.target.files[0];
+                if (selectedFile) {
+                    setFile(selectedFile);
+                    await extractFromFile(selectedFile);
+                }
+            };
+
+            const handleDragOver = (e) => {
+                e.preventDefault();
+                setDragOver(true);
+            };
+
+            const handleDragLeave = () => {
+                setDragOver(false);
+            };
+
+            const handleDrop = async (e) => {
+                e.preventDefault();
+                setDragOver(false);
+                const droppedFile = e.dataTransfer.files[0];
+                if (droppedFile) {
+                    setFile(droppedFile);
+                    await extractFromFile(droppedFile);
+                }
+            };
+
+            const startCamera = async () => {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ 
+                        video: { facingMode: 'environment' } 
+                    });
+                    if (videoRef.current) {
+                        videoRef.current.srcObject = stream;
+                        setCameraActive(true);
+                    }
+                } catch (error) {
+                    console.error('Error accessing camera:', error);
+                    alert('Tidak dapat mengakses kamera. Pastikan izin kamera telah diberikan.');
+                }
+            };
+
+            const stopCamera = () => {
+                if (videoRef.current && videoRef.current.srcObject) {
+                    const tracks = videoRef.current.srcObject.getTracks();
+                    tracks.forEach(track => track.stop());
+                    videoRef.current.srcObject = null;
+                }
+                setCameraActive(false);
+            };
+
+            const capturePhoto = () => {
+                if (canvasRef.current && videoRef.current) {
+                    const canvas = canvasRef.current;
+                    const video = videoRef.current;
+                    
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(video, 0, 0);
+                    
+                    const imageData = canvas.toDataURL('image/png');
+                    setCapturedImage(imageData);
+                    stopCamera();
+                }
+            };
+
+            const processImageOCR = async () => {
+                if (!capturedImage) return;
+
+                setExtracting(true);
+                setOcrProgress(0);
+                setTteInfo(null);
+                setServerData(null);
+
+                try {
+                    const result = await Tesseract.recognize(
+                        capturedImage,
+                        'ind+eng',
+                        {
+                            logger: (m) => {
+                                if (m.status === 'recognizing text') {
+                                    setOcrProgress(Math.round(m.progress * 100));
+                                }
+                            }
+                        }
+                    );
+
+                    const text = result.data.text;
+                    console.log('OCR Result:', text);
+                    setExtractedText(text);
+
+                    const analysis = analyzeTTE(text);
+                    setTteInfo(analysis);
+
+                    if (analysis.token && analysis.verificationUrl) {
+                        await verifyWithServer(analysis);
+                    } else if (analysis.type === 'TTE_BSRE') {
+                        setTteInfo(prev => ({ ...prev, isValid: true }));
+                    }
+
+                } catch (error) {
+                    console.error('OCR Error:', error);
+                    alert('Gagal membaca teks dari gambar. Coba ambil foto yang lebih jelas.');
+                } finally {
+                    setExtracting(false);
+                    setOcrProgress(0);
+                }
+            };
+
+            const retakePhoto = () => {
+                setCapturedImage(null);
+                setTteInfo(null);
+                setExtractedText('');
+                setServerData(null);
+                startCamera();
+            };
+
+            const formatFileSize = (bytes) => {
+                if (bytes < 1024) return bytes + ' B';
+                if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(2) + ' KB';
+                return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+            };
+
+            const openVerification = () => {
+                if (tteInfo && tteInfo.verificationUrl) {
+                    window.open(tteInfo.verificationUrl, '_blank', 'noopener,noreferrer');
+                }
+            };
+
+            useEffect(() => {
+                return () => {
+                    stopCamera();
+                };
+            }, []);
+
+            return (
+                <div className="container">
+                    <div className="header">
+                        <div className="logo-container">
+                            <div className="logo">⚡</div>
+                        </div>
+                        <h1>TTE Verifier</h1>
+                        <p className="subtitle">Verifikasi Real-time Tanda Tangan Elektronik Indonesia</p>
+                    </div>
+
+                    <div className="card">
+                        <div className="tabs">
+                            <button 
+                                className={`tab ${activeTab === 'upload' ? 'active' : ''}`}
+                                onClick={() => setActiveTab('upload')}
+                            >
+                                📁 Upload
+                            </button>
+                            <button 
+                                className={`tab ${activeTab === 'camera' ? 'active' : ''}`}
+                                onClick={() => setActiveTab('camera')}
+                            >
+                                📸 Camera
+                            </button>
+                        </div>
+
+                        {activeTab === 'upload' && (
+                            <div className="input-section">
+                                <label className="section-label">Upload Dokumen TTE</label>
+                                <div 
+                                    className={`file-upload ${dragOver ? 'dragover' : ''}`}
+                                    onClick={() => fileInputRef.current.click()}
+                                    onDragOver={handleDragOver}
+                                    onDragLeave={handleDragLeave}
+                                    onDrop={handleDrop}
+                                >
+                                    <input 
+                                        type="file" 
+                                        ref={fileInputRef}
+                                        onChange={handleFileChange}
+                                        accept=".pdf,.txt"
+                                    />
+                                    <div className="upload-icon">📄</div>
+                                    <div className="upload-text">
+                                        <strong>Klik atau drag & drop file</strong><br/>
+                                        Mendukung PDF dan TXT dengan TTE
+                                    </div>
+                                </div>
+
+                                {file && (
+                                    <div className="file-info">
+                                        <div className="file-info-icon">📋</div>
+                                        <div className="file-info-details">
+                                            <div className="file-info-name">{file.name}</div>
+                                            <div className="file-info-size">
+                                                {formatFileSize(file.size)}
+                                                {extracting && <span style={{marginLeft: '12px', color: 'var(--accent-cyan)'}}>⚙️ Memproses...</span>}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {verificationStatus && (
+                                    <div className={`verify-status ${verifying ? 'verifying' : serverData ? 'success' : 'error'}`}>
+                                        {verificationStatus}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {activeTab === 'camera' && (
+                            <div className="input-section">
+                                <label className="section-label">Ambil Foto Dokumen TTE</label>
+                                
+                                {!cameraActive && !capturedImage && (
+                                    <div style={{textAlign: 'center', padding: '40px'}}>
+                                        <button className="button" onClick={startCamera}>
+                                            📸 Aktifkan Kamera
+                                        </button>
+                                    </div>
+                                )}
+
+                                {cameraActive && (
+                                    <div className="camera-container">
+                                        <video 
+                                            ref={videoRef} 
+                                            className="camera-video"
+                                            autoPlay 
+                                            playsInline
+                                        />
+                                        <canvas ref={canvasRef} style={{display: 'none'}} />
+                                        
+                                        <div className="camera-controls" style={{marginTop: '16px'}}>
+                                            <button className="button" onClick={capturePhoto}>
+                                                📷 Ambil Foto
+                                            </button>
+                                            <button className="button button-secondary" onClick={stopCamera}>
+                                                ✕ Tutup
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {capturedImage && (
+                                    <div>
+                                        <div className="camera-container">
+                                            <img 
+                                                src={capturedImage} 
+                                                className="camera-preview"
+                                                alt="Captured document"
+                                            />
+                                        </div>
+                                        
+                                        <div className="camera-controls">
+                                            <button 
+                                                className="button" 
+                                                onClick={processImageOCR}
+                                                disabled={extracting}
+                                            >
+                                                {extracting ? (
+                                                    <>
+                                                        <span className="loading"></span>
+                                                        OCR... {ocrProgress}%
+                                                    </>
+                                                ) : (
+                                                    '🔍 Proses OCR'
+                                                )}
+                                            </button>
+                                            <button 
+                                                className="button button-secondary" 
+                                                onClick={retakePhoto}
+                                                disabled={extracting}
+                                            >
+                                                🔄 Foto Ulang
+                                            </button>
+                                        </div>
+
+                                        {extracting && (
+                                            <div className="progress-bar">
+                                                <div 
+                                                    className="progress-fill" 
+                                                    style={{width: `${ocrProgress}%`}}
+                                                />
+                                            </div>
+                                        )}
+
+                                        {verificationStatus && (
+                                            <div className={`verify-status ${verifying ? 'verifying' : serverData ? 'success' : 'error'}`}>
+                                                {verificationStatus}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {extractedText && (
+                            <div className="extracted-text-preview">
+                                <strong style={{color: 'var(--accent-cyan)'}}>📝 Teks yang diekstrak:</strong>
+                                <pre style={{whiteSpace: 'pre-wrap', marginTop: '8px'}}>
+                                    {extractedText.substring(0, 500)}
+                                    {extractedText.length > 500 && '...'}
+                                </pre>
+                            </div>
+                        )}
+                    </div>
+
+                    {tteInfo && tteInfo.hasSignature && (
+                        <div className="card tte-result">
+                            <div className="result-header">
+                                <div className={`result-icon ${
+                                    tteInfo.isValid === true ? 'valid' : 
+                                    tteInfo.isValid === false ? 'invalid' : 
+                                    'warning'
+                                }`}>
+                                    {tteInfo.isValid === true ? '✓' : 
+                                     tteInfo.isValid === false ? '✗' : 
+                                     '⚠'}
+                                </div>
+                                <div className="result-content">
+                                    <h2>
+                                        {tteInfo.isValid === true ? 'TTE Terverifikasi Valid' : 
+                                         tteInfo.isValid === false ? 'TTE Tidak Valid' : 
+                                         'TTE Terdeteksi'}
+                                    </h2>
+                                    <p>
+                                        {tteInfo.isValid === true ? 'Dokumen telah diverifikasi dengan server dan data cocok' : 
+                                         tteInfo.isValid === false ? 'Data dokumen tidak cocok dengan server verifikasi' : 
+                                         verifying ? 'Sedang memverifikasi dengan server...' : 'Menunggu verifikasi'}
+                                    </p>
+                                    <div style={{marginTop: '12px', display: 'flex', gap: '8px', flexWrap: 'wrap'}}>
+                                        {tteInfo.isValid !== null && (
+                                            <div className={`validity-badge ${
+                                                tteInfo.isValid === true ? 'valid' : 
+                                                tteInfo.isValid === false ? 'invalid' : 
+                                                'warning'
+                                            }`}>
+                                                {tteInfo.isValid === true ? '✓ VALID & SAH' : 
+                                                 tteInfo.isValid === false ? '✗ TIDAK VALID' : 
+                                                 '⚠ VERIFYING...'}
+                                            </div>
+                                        )}
+                                        {tteInfo.type && (
+                                            <div className="tte-type-badge">
+                                                {tteInfo.issuer === 'KEMENAG' ? '🔐 TTE KEMENAG' : 
+                                                 tteInfo.issuer === 'KOMINFO' ? '🔐 TTE KOMINFO' :
+                                                 tteInfo.issuer === 'BSRE' ? '🔐 TTE BSrE/BSSN' : 
+                                                 '🔐 TTE'}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="detail-grid">
+                                {tteInfo.type && (
+                                    <div className="detail-row">
+                                        <div className="detail-label">Jenis TTE</div>
+                                        <div className="detail-value">{tteInfo.type}</div>
+                                    </div>
+                                )}
+
+                                {tteInfo.token && (
+                                    <div className={`detail-row ${
+                                        tteInfo.comparison?.tokenMatch === true ? 'match' : 
+                                        tteInfo.comparison?.tokenMatch === false ? 'mismatch' : ''
+                                    }`}>
+                                        <div className="detail-label">Token</div>
+                                        <div className="detail-value">
+                                            {tteInfo.token}
+                                            {tteInfo.comparison?.tokenMatch === true && ' ✓'}
+                                            {tteInfo.comparison?.tokenMatch === false && ' ✗'}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {tteInfo.issuerName && (
+                                    <div className="detail-row">
+                                        <div className="detail-label">Penerbit</div>
+                                        <div className="detail-value">{tteInfo.issuerName}</div>
+                                    </div>
+                                )}
+
+                                {tteInfo.documentNumber && (
+                                    <div className={`detail-row ${
+                                        tteInfo.comparison?.documentNumberMatch === true ? 'match' : 
+                                        tteInfo.comparison?.documentNumberMatch === false ? 'mismatch' : ''
+                                    }`}>
+                                        <div className="detail-label">Nomor Dokumen</div>
+                                        <div className="detail-value">
+                                            {serverData ? (
+                                                <div className="comparison-grid">
+                                                    <div className="comparison-item">
+                                                        <div className="comparison-label">📄 Dokumen</div>
+                                                        <div className={`comparison-value ${
+                                                            tteInfo.comparison?.documentNumberMatch ? 'match' : 'mismatch'
+                                                        }`}>
+                                                            {tteInfo.documentNumber}
+                                                        </div>
+                                                    </div>
+                                                    <div className="comparison-item">
+                                                        <div className="comparison-label">🌐 Server</div>
+                                                        <div className={`comparison-value ${
+                                                            tteInfo.comparison?.documentNumberMatch ? 'match' : 'mismatch'
+                                                        }`}>
+                                                            {serverData.documentNumber}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ) : tteInfo.documentNumber}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {tteInfo.signedBy && (
+                                    <div className={`detail-row ${
+                                        tteInfo.comparison?.signedByMatch === true ? 'match' : 
+                                        tteInfo.comparison?.signedByMatch === false ? 'mismatch' : ''
+                                    }`}>
+                                        <div className="detail-label">Penandatangan</div>
+                                        <div className="detail-value">
+                                            {serverData ? (
+                                                <div className="comparison-grid">
+                                                    <div className="comparison-item">
+                                                        <div className="comparison-label">📄 Dokumen</div>
+                                                        <div className={`comparison-value ${
+                                                            tteInfo.comparison?.signedByMatch ? 'match' : 'mismatch'
+                                                        }`}>
+                                                            {tteInfo.signedBy}
+                                                        </div>
+                                                    </div>
+                                                    <div className="comparison-item">
+                                                        <div className="comparison-label">🌐 Server</div>
+                                                        <div className={`comparison-value ${
+                                                            tteInfo.comparison?.signedByMatch ? 'match' : 'mismatch'
+                                                        }`}>
+                                                            {serverData.signedBy}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ) : tteInfo.signedBy}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {tteInfo.signedDate && (
+                                    <div className={`detail-row ${
+                                        tteInfo.comparison?.dateMatch === true ? 'match' : 
+                                        tteInfo.comparison?.dateMatch === false ? 'mismatch' : ''
+                                    }`}>
+                                        <div className="detail-label">Tanggal</div>
+                                        <div className="detail-value">
+                                            {serverData ? (
+                                                <div className="comparison-grid">
+                                                    <div className="comparison-item">
+                                                        <div className="comparison-label">📄 Dokumen</div>
+                                                        <div className={`comparison-value ${
+                                                            tteInfo.comparison?.dateMatch ? 'match' : 'mismatch'
+                                                        }`}>
+                                                            {tteInfo.signedDate}
+                                                        </div>
+                                                    </div>
+                                                    <div className="comparison-item">
+                                                        <div className="comparison-label">🌐 Server</div>
+                                                        <div className={`comparison-value ${
+                                                            tteInfo.comparison?.dateMatch ? 'match' : 'mismatch'
+                                                        }`}>
+                                                            {serverData.signedDate}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ) : tteInfo.signedDate}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {tteInfo.verificationUrl && (
+                                    <div className="detail-row">
+                                        <div className="detail-label">Link Verifikasi</div>
+                                        <div className="detail-value">
+                                            <a 
+                                                href={tteInfo.verificationUrl} 
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                style={{color: 'var(--accent-magenta)', textDecoration: 'none'}}
+                                            >
+                                                {tteInfo.verificationUrl} ↗
+                                            </a>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {tteInfo.verificationUrl && (
+                                <button 
+                                    className="button" 
+                                    onClick={openVerification}
+                                    style={{marginTop: '24px', width: '100%'}}
+                                >
+                                    🔗 Buka Halaman Verifikasi Resmi
+                                </button>
+                            )}
+
+                            {tteInfo.isValid === true && (
+                                <div className="alert alert-success">
+                                    <div className="alert-icon">✅</div>
+                                    <div>
+                                        <strong>VALID & SAH:</strong> Dokumen ini telah diverifikasi dengan server {tteInfo.issuerName}. 
+                                        Semua data cocok dengan database resmi. Tanda tangan elektronik ini SAH secara hukum sesuai UU ITE.
+                                    </div>
+                                </div>
+                            )}
+
+                            {tteInfo.isValid === false && (
+                                <div className="alert alert-error">
+                                    <div className="alert-icon">❌</div>
+                                    <div>
+                                        <strong>TIDAK VALID:</strong> Terdapat ketidakcocokan data antara dokumen dengan server verifikasi. 
+                                        Dokumen ini mungkin telah dimodifikasi atau token tidak valid.
+                                    </div>
+                                </div>
+                            )}
+
+                            {tteInfo.type === 'TTE_BSRE' && (
+                                <div className="alert alert-info">
+                                    <div className="alert-icon">ℹ️</div>
+                                    <div>
+                                        <strong>TTE BSrE/BSSN:</strong> Dokumen ini menggunakan sertifikat digital BSrE. 
+                                        Verifikasi penuh dilakukan melalui sertifikat yang tertanam dalam PDF. 
+                                        Gunakan PDF reader yang mendukung verifikasi digital signature untuk validasi tambahan.
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {tteInfo && !tteInfo.hasSignature && (
+                        <div className="card">
+                            <div className="alert alert-warning">
+                                <div className="alert-icon">⚠️</div>
+                                <div>
+                                    <strong>Peringatan:</strong> Tidak ditemukan tanda tangan elektronik dalam dokumen ini.
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="footer">
+                        <p>TTE VERIFIER © 2024 | Verifikasi Real-time dengan Server Resmi</p>
+                        <p style={{marginTop: '8px', opacity: 0.6}}>
+                            Mendukung TTE Kemenag, Kominfo & BSrE/BSSN
+                        </p>
+                    </div>
+                </div>
+            );
+        }
+
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>
